@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Team } from "./Team";
 import { buildUnitMesh } from "./UnitMesh";
+import { HealthBar } from "./HealthBar";
 import type { Behavior } from "../behaviors/Behavior";
 import type { World } from "../world/World";
 
@@ -25,6 +26,9 @@ export class Unit {
   readonly mesh: THREE.Group;
   readonly behavior: Behavior;
 
+  private readonly visual: THREE.Group;
+  private readonly healthBar: HealthBar;
+
   maxHp: number;
   hp: number;
   moveSpeed: number;
@@ -46,8 +50,13 @@ export class Unit {
     this.attackRange = config.attackRange ?? 1.6;
     this.attackInterval = config.attackInterval ?? 0.8;
 
-    this.mesh = buildUnitMesh(config.color);
+    const { root, visual } = buildUnitMesh(config.color);
+    this.mesh = root;
+    this.visual = visual;
     this.mesh.position.copy(config.position);
+
+    this.healthBar = new HealthBar(2.6);
+    this.mesh.add(this.healthBar.group);
   }
 
   get position(): THREE.Vector3 {
@@ -72,7 +81,7 @@ export class Unit {
 
   faceDirection(direction: THREE.Vector3) {
     if (direction.lengthSq() < 1e-6) return;
-    this.mesh.rotation.y = Math.atan2(direction.x, direction.z);
+    this.visual.rotation.y = Math.atan2(direction.x, direction.z);
   }
 
   tryAttack(target: Unit, delta: number) {
@@ -84,6 +93,7 @@ export class Unit {
 
   takeDamage(amount: number) {
     this.hp = Math.max(0, this.hp - amount);
+    this.healthBar.setFraction(this.hp / this.maxHp);
     if (this.hp === 0) this.setState("dead");
   }
 
@@ -93,6 +103,7 @@ export class Unit {
   }
 
   dispose() {
+    this.healthBar.dispose();
     this.mesh.removeFromParent();
   }
 }
