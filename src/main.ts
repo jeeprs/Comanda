@@ -54,7 +54,8 @@ const MAX_LISTED = 10;
 
 game.setOnTick((world) => {
   const controls =
-    "WASD pan · Q/E rotate · R/F pitch · scroll zoom\nclick the ground to spawn a familiar\n\n";
+    "WASD pan · Q/E rotate · R/F pitch · scroll zoom\n" +
+    "left-click: spawn familiar · right-click: spawn enemy\n\n";
 
   const counts = `familiars ${world.unitsOfTeam(Team.Player).length}  ·  enemies ${
     world.unitsOfTeam(Team.Enemy).length

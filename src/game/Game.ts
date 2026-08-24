@@ -41,7 +41,11 @@ export class Game {
     this.spawnDemoUnits();
 
     window.addEventListener("resize", () => this.handleResize());
-    this.renderer.domElement.addEventListener("click", (e) => this.handleClick(e));
+    this.renderer.domElement.addEventListener("click", (e) => this.handleClick(e, Team.Player));
+    this.renderer.domElement.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); // suppress the browser menu so right-click is ours
+      this.handleClick(e, Team.Enemy);
+    });
     this.handleResize();
   }
 
@@ -90,8 +94,8 @@ export class Game {
     this.spawnUnit(Team.Enemy, new THREE.Vector3(10, 0, 0));
   }
 
-  /** Spawns a familiar wherever the player clicked on the ground. */
-  private handleClick(event: MouseEvent) {
+  /** Spawns a unit of the given team wherever the player clicked on the ground. */
+  private handleClick(event: MouseEvent, team: Team) {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const pointer = new THREE.Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -105,7 +109,7 @@ export class Game {
     if (!this.raycaster.ray.intersectPlane(this.groundPlane, point)) return;
     if (Math.abs(point.x) > SPAWN_BOUNDS || Math.abs(point.z) > SPAWN_BOUNDS) return;
 
-    this.spawnUnit(Team.Player, point);
+    this.spawnUnit(team, point);
   }
 
   /** Clears the battlefield and respawns the starting units. */
