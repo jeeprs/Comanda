@@ -6,12 +6,24 @@ import { Unit } from "./entities/Unit";
 import { Team } from "./entities/Team";
 import { SeekAndAttackBehavior } from "./behaviors/SeekAndAttackBehavior";
 
+const TEAM_COLOR: Record<Team, number> = {
+  [Team.Player]: 0x4fd1c5,
+  [Team.Enemy]: 0xe05353,
+};
+
+/** Half-extent of the walkable ground, so spawns stay on the plane. */
+const SPAWN_BOUNDS = 48;
+
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly clock = new THREE.Clock();
   private readonly wizardCamera: WizardCamera;
   private readonly world = new World();
+
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private nextUnitId = 0;
 
   private readonly container: HTMLElement;
   private onTick?: (world: World) => void;
@@ -29,6 +41,7 @@ export class Game {
     this.spawnDemoUnits();
 
     window.addEventListener("resize", () => this.handleResize());
+    this.renderer.domElement.addEventListener("click", (e) => this.handleClick(e));
     this.handleResize();
   }
 
@@ -57,32 +70,48 @@ export class Game {
     this.scene.add(sun);
   }
 
+  /** Creates a unit of the given team and puts it on the battlefield. */
+  spawnUnit(team: Team, position: THREE.Vector3): Unit {
+    const label = team === Team.Player ? "familiar" : "enemy";
+    const unit = new Unit({
+      id: `${label}-${++this.nextUnitId}`,
+      team,
+      color: TEAM_COLOR[team],
+      position,
+      behavior: new SeekAndAttackBehavior(),
+    });
+    this.world.add(unit);
+    this.scene.add(unit.mesh);
+    return unit;
+  }
+
   private spawnDemoUnits() {
-    const familiar = new Unit({
-      id: "familiar-1",
-      team: Team.Player,
-      color: 0x4fd1c5,
-      position: new THREE.Vector3(-10, 0, 0),
-      behavior: new SeekAndAttackBehavior(),
-    });
+    this.spawnUnit(Team.Player, new THREE.Vector3(-10, 0, 0));
+    this.spawnUnit(Team.Enemy, new THREE.Vector3(10, 0, 0));
+  }
 
-    const enemy = new Unit({
-      id: "enemy-1",
-      team: Team.Enemy,
-      color: 0xe05353,
-      position: new THREE.Vector3(10, 0, 0),
-      behavior: new SeekAndAttackBehavior(),
-    });
+  /** Spawns a familiar wherever the player clicked on the ground. */
+  private handleClick(event: MouseEvent) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const pointer = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
 
-    for (const unit of [familiar, enemy]) {
-      this.world.add(unit);
-      this.scene.add(unit.mesh);
-    }
+    this.raycaster.setFromCamera(pointer, this.wizardCamera.camera);
+
+    const point = new THREE.Vector3();
+    // Misses only when looking exactly along the horizon.
+    if (!this.raycaster.ray.intersectPlane(this.groundPlane, point)) return;
+    if (Math.abs(point.x) > SPAWN_BOUNDS || Math.abs(point.z) > SPAWN_BOUNDS) return;
+
+    this.spawnUnit(Team.Player, point);
   }
 
   /** Clears the battlefield and respawns the starting units. */
   restart() {
     this.world.clear();
+    this.nextUnitId = 0;
     this.spawnDemoUnits();
   }
 

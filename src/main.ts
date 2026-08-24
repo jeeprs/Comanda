@@ -1,5 +1,6 @@
 import "./style.css";
 import { Game } from "./game/Game";
+import { Team } from "./game/entities/Team";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -49,11 +50,23 @@ restartButton.addEventListener("click", () => {
   game.restart();
   restartButton.blur(); // otherwise Space/Enter would re-trigger it
 });
+const MAX_LISTED = 10;
+
 game.setOnTick((world) => {
-  const controls = "WASD pan · Q/E rotate · R/F pitch · scroll zoom\n\n";
-  const status = world.units
-    .map((u) => `${u.id.padEnd(10)} [${u.team}] ${u.getState().padEnd(9)} hp ${u.hp}/${u.maxHp}`)
+  const controls =
+    "WASD pan · Q/E rotate · R/F pitch · scroll zoom\nclick the ground to spawn a familiar\n\n";
+
+  const counts = `familiars ${world.unitsOfTeam(Team.Player).length}  ·  enemies ${
+    world.unitsOfTeam(Team.Enemy).length
+  }\n\n`;
+
+  const listed = world.units
+    .slice(0, MAX_LISTED)
+    .map((u) => `${u.id.padEnd(11)} ${u.getState().padEnd(9)} hp ${u.hp}/${u.maxHp}`)
     .join("\n");
-  hud.textContent = controls + status;
+
+  const overflow = world.units.length > MAX_LISTED ? `\n… +${world.units.length - MAX_LISTED} more` : "";
+
+  hud.textContent = controls + counts + listed + overflow;
 });
 game.start();
