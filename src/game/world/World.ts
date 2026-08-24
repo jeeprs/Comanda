@@ -1,5 +1,6 @@
 import type { Unit } from "../entities/Unit";
 import type { Team } from "../entities/Team";
+import { canTarget } from "../entities/Archetype";
 
 /** Holds all live units and answers the queries behaviors need (nearest enemy, etc). */
 export class World {
@@ -22,11 +23,16 @@ export class World {
     this.units.splice(0, this.units.length, ...this.units.filter((u) => u.isAlive()));
   }
 
+  /**
+   * Nearest living enemy this unit is actually able to attack — a ground-only
+   * attacker will not see aerial units at all.
+   */
   nearestEnemy(unit: Unit): Unit | undefined {
     let nearest: Unit | undefined;
     let nearestDistSq = Infinity;
     for (const other of this.units) {
       if (other === unit || other.team === unit.team || !other.isAlive()) continue;
+      if (!canTarget(unit.archetype, other.domain)) continue;
       const distSq = unit.position.distanceToSquared(other.position);
       if (distSq < nearestDistSq) {
         nearestDistSq = distSq;

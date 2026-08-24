@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Team } from "./Team";
 import { buildUnitMesh } from "./UnitMesh";
 import { HealthBar } from "./HealthBar";
+import type { Archetype, Domain } from "./Archetype";
 import type { Behavior } from "../behaviors/Behavior";
 import type { World } from "../world/World";
 
@@ -10,31 +11,23 @@ export type UnitState = "idle" | "moving" | "attacking" | "dead";
 export interface UnitConfig {
   id: string;
   team: Team;
-  color: number;
+  teamColor: number;
+  archetype: Archetype;
   position: THREE.Vector3;
   behavior: Behavior;
-  maxHp?: number;
-  moveSpeed?: number;
-  attackDamage?: number;
-  attackRange?: number;
-  attackInterval?: number;
 }
 
 export class Unit {
   readonly id: string;
   readonly team: Team;
+  readonly archetype: Archetype;
   readonly mesh: THREE.Group;
   readonly behavior: Behavior;
 
   private readonly visual: THREE.Group;
   private readonly healthBar: HealthBar;
 
-  maxHp: number;
   hp: number;
-  moveSpeed: number;
-  attackDamage: number;
-  attackRange: number;
-  attackInterval: number;
 
   private state: UnitState = "idle";
   private attackCooldown = 0;
@@ -42,21 +35,42 @@ export class Unit {
   constructor(config: UnitConfig) {
     this.id = config.id;
     this.team = config.team;
+    this.archetype = config.archetype;
     this.behavior = config.behavior;
-    this.maxHp = config.maxHp ?? 100;
-    this.hp = this.maxHp;
-    this.moveSpeed = config.moveSpeed ?? 3;
-    this.attackDamage = config.attackDamage ?? 12;
-    this.attackRange = config.attackRange ?? 1.6;
-    this.attackInterval = config.attackInterval ?? 0.8;
+    this.hp = config.archetype.maxHp;
 
-    const { root, visual } = buildUnitMesh(config.color);
+    const { root, visual } = buildUnitMesh(config.archetype, config.teamColor);
     this.mesh = root;
     this.visual = visual;
     this.mesh.position.copy(config.position);
 
-    this.healthBar = new HealthBar(2.6);
+    this.healthBar = new HealthBar(config.archetype.hoverHeight + 2.4);
     this.mesh.add(this.healthBar.group);
+  }
+
+  get maxHp(): number {
+    return this.archetype.maxHp;
+  }
+
+  get moveSpeed(): number {
+    return this.archetype.moveSpeed;
+  }
+
+  get attackDamage(): number {
+    return this.archetype.attackDamage;
+  }
+
+  get attackRange(): number {
+    return this.archetype.attackRange;
+  }
+
+  get attackInterval(): number {
+    return this.archetype.attackInterval;
+  }
+
+  /** What this unit is, for targeting checks. */
+  get domain(): Domain {
+    return this.archetype.domain;
   }
 
   get position(): THREE.Vector3 {

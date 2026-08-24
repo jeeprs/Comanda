@@ -5,6 +5,7 @@ import { WizardCamera } from "./camera/WizardCamera";
 import { Unit } from "./entities/Unit";
 import { Team } from "./entities/Team";
 import { SeekAndAttackBehavior } from "./behaviors/SeekAndAttackBehavior";
+import { ARCHETYPES, ARCHETYPE_ORDER, type Archetype, type ArchetypeId } from "./entities/Archetype";
 
 const TEAM_COLOR: Record<Team, number> = {
   [Team.Player]: 0x4fd1c5,
@@ -24,6 +25,7 @@ export class Game {
   private readonly raycaster = new THREE.Raycaster();
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private nextUnitId = 0;
+  private selectedArchetype: ArchetypeId = "ground";
 
   private readonly container: HTMLElement;
   private onTick?: (world: World) => void;
@@ -45,6 +47,12 @@ export class Game {
     this.renderer.domElement.addEventListener("contextmenu", (e) => {
       e.preventDefault(); // suppress the browser menu so right-click is ours
       this.handleClick(e, Team.Enemy);
+    });
+    window.addEventListener("keydown", (e) => {
+      const index = Number(e.key) - 1;
+      if (index >= 0 && index < ARCHETYPE_ORDER.length) {
+        this.selectedArchetype = ARCHETYPE_ORDER[index];
+      }
     });
     this.handleResize();
   }
@@ -74,13 +82,14 @@ export class Game {
     this.scene.add(sun);
   }
 
-  /** Creates a unit of the given team and puts it on the battlefield. */
-  spawnUnit(team: Team, position: THREE.Vector3): Unit {
+  /** Creates a unit of the given team and archetype and puts it on the field. */
+  spawnUnit(team: Team, archetype: Archetype, position: THREE.Vector3): Unit {
     const label = team === Team.Player ? "familiar" : "enemy";
     const unit = new Unit({
       id: `${label}-${++this.nextUnitId}`,
       team,
-      color: TEAM_COLOR[team],
+      teamColor: TEAM_COLOR[team],
+      archetype,
       position,
       behavior: new SeekAndAttackBehavior(),
     });
@@ -89,9 +98,13 @@ export class Game {
     return unit;
   }
 
+  getSelectedArchetype(): Archetype {
+    return ARCHETYPES[this.selectedArchetype];
+  }
+
   private spawnDemoUnits() {
-    this.spawnUnit(Team.Player, new THREE.Vector3(-10, 0, 0));
-    this.spawnUnit(Team.Enemy, new THREE.Vector3(10, 0, 0));
+    this.spawnUnit(Team.Player, ARCHETYPES.ground, new THREE.Vector3(-10, 0, 0));
+    this.spawnUnit(Team.Enemy, ARCHETYPES.ground, new THREE.Vector3(10, 0, 0));
   }
 
   /** Spawns a unit of the given team wherever the player clicked on the ground. */
@@ -109,7 +122,7 @@ export class Game {
     if (!this.raycaster.ray.intersectPlane(this.groundPlane, point)) return;
     if (Math.abs(point.x) > SPAWN_BOUNDS || Math.abs(point.z) > SPAWN_BOUNDS) return;
 
-    this.spawnUnit(team, point);
+    this.spawnUnit(team, this.getSelectedArchetype(), point);
   }
 
   /** Clears the battlefield and respawns the starting units. */

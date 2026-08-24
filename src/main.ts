@@ -1,6 +1,7 @@
 import "./style.css";
 import { Game } from "./game/Game";
 import { Team } from "./game/entities/Team";
+import { ARCHETYPES, ARCHETYPE_ORDER } from "./game/entities/Archetype";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -53,9 +54,19 @@ restartButton.addEventListener("click", () => {
 const MAX_LISTED = 10;
 
 game.setOnTick((world) => {
+  const selected = game.getSelectedArchetype();
+
   const controls =
     "WASD pan · Q/E rotate · R/F pitch · scroll zoom\n" +
     "left-click: spawn familiar · right-click: spawn enemy\n\n";
+
+  const picker =
+    ARCHETYPE_ORDER.map((id, i) => {
+      const a = ARCHETYPES[id];
+      return `${a.id === selected.id ? "▸" : " "}${i + 1} ${a.name}`;
+    }).join("  ") +
+    `\n   hp ${selected.maxHp} · spd ${selected.moveSpeed} · dmg ${selected.attackDamage}` +
+    ` · rng ${selected.attackRange} · hits ${selected.canTarget.join("+")}\n\n`;
 
   const counts = `familiars ${world.unitsOfTeam(Team.Player).length}  ·  enemies ${
     world.unitsOfTeam(Team.Enemy).length
@@ -63,11 +74,14 @@ game.setOnTick((world) => {
 
   const listed = world.units
     .slice(0, MAX_LISTED)
-    .map((u) => `${u.id.padEnd(11)} ${u.getState().padEnd(9)} hp ${u.hp}/${u.maxHp}`)
+    .map(
+      (u) =>
+        `${u.id.padEnd(11)} ${u.archetype.name.padEnd(7)} ${u.getState().padEnd(9)} hp ${u.hp}/${u.maxHp}`,
+    )
     .join("\n");
 
   const overflow = world.units.length > MAX_LISTED ? `\n… +${world.units.length - MAX_LISTED} more` : "";
 
-  hud.textContent = controls + counts + listed + overflow;
+  hud.textContent = controls + picker + counts + listed + overflow;
 });
 game.start();

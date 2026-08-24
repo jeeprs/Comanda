@@ -5,7 +5,11 @@ import type { World } from "../world/World";
 
 const _toTarget = new THREE.Vector3();
 
-/** Walks toward the nearest living enemy and attacks it once in range. */
+/**
+ * Walks toward the nearest enemy this unit can actually attack and engages it
+ * once in range. Idles when every living enemy is out of its targetable
+ * domains (e.g. a ground-only melee unit facing nothing but fliers).
+ */
 export class SeekAndAttackBehavior implements Behavior {
   update(unit: Unit, world: World, delta: number): void {
     const target = world.nearestEnemy(unit);
