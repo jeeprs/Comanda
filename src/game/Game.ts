@@ -80,6 +80,12 @@ export class Game {
     }
   }
 
+  /** Clears the battlefield and respawns the starting units. */
+  restart() {
+    this.world.clear();
+    this.spawnDemoUnits();
+  }
+
   private handleResize() {
     const { clientWidth, clientHeight } = this.container;
     this.renderer.setSize(clientWidth, clientHeight);

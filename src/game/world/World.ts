@@ -9,6 +9,12 @@ export class World {
     this.units.push(unit);
   }
 
+  /** Despawns every unit, releasing their meshes and hp bars. */
+  clear() {
+    for (const unit of this.units) unit.dispose();
+    this.units.length = 0;
+  }
+
   removeDead() {
     for (const unit of this.units.filter((u) => !u.isAlive())) {
       unit.dispose();
