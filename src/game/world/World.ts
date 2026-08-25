@@ -42,6 +42,19 @@ export class World {
     return nearest;
   }
 
+  /** Every living enemy inside `radius` that this unit is able to attack. */
+  enemiesWithin(unit: Unit, radius: number): Unit[] {
+    const radiusSq = radius * radius;
+    return this.units.filter(
+      (other) =>
+        other !== unit &&
+        other.team !== unit.team &&
+        other.isAlive() &&
+        canTarget(unit.archetype, other.domain) &&
+        unit.position.distanceToSquared(other.position) <= radiusSq,
+    );
+  }
+
   unitsOfTeam(team: Team): Unit[] {
     return this.units.filter((u) => u.team === team);
   }

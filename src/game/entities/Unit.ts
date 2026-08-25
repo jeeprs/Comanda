@@ -3,6 +3,12 @@ import { Team } from "./Team";
 import { buildUnitMesh } from "./UnitMesh";
 import { HealthBar } from "./HealthBar";
 import type { Archetype, Domain } from "./Archetype";
+import {
+  SLAM_COOLDOWN,
+  SLAM_DAMAGE,
+  SLAM_RADIUS,
+  type SkillTreeState,
+} from "../skills/SkillTree";
 import type { Behavior } from "../behaviors/Behavior";
 import type { World } from "../world/World";
 
@@ -15,6 +21,10 @@ export interface UnitConfig {
   archetype: Archetype;
   position: THREE.Vector3;
   behavior: Behavior;
+  /** Progression applied to this unit; pass EMPTY_TREE for none. */
+  skills: SkillTreeState;
+  /** Called when a slam lands, so the scene can show it. */
+  onSlam?: (position: THREE.Vector3, radius: number) => void;
 }
 
 export class Unit {
@@ -23,21 +33,26 @@ export class Unit {
   readonly archetype: Archetype;
   readonly mesh: THREE.Group;
   readonly behavior: Behavior;
+  readonly skills: SkillTreeState;
 
   private readonly visual: THREE.Group;
   private readonly healthBar: HealthBar;
+  private readonly onSlam?: (position: THREE.Vector3, radius: number) => void;
 
   hp: number;
 
   private state: UnitState = "idle";
   private attackCooldown = 0;
+  private slamCooldown = SLAM_COOLDOWN;
 
   constructor(config: UnitConfig) {
     this.id = config.id;
     this.team = config.team;
     this.archetype = config.archetype;
     this.behavior = config.behavior;
-    this.hp = config.archetype.maxHp;
+    this.skills = config.skills;
+    this.onSlam = config.onSlam;
+    this.hp = config.skills.statsFor(config.archetype).maxHp;
 
     const { root, visual } = buildUnitMesh(config.archetype, config.teamColor);
     this.mesh = root;
@@ -48,24 +63,29 @@ export class Unit {
     this.mesh.add(this.healthBar.group);
   }
 
+  /** Archetype baseline with unlocked skill modifiers folded in. */
+  get stats() {
+    return this.skills.statsFor(this.archetype);
+  }
+
   get maxHp(): number {
-    return this.archetype.maxHp;
+    return this.stats.maxHp;
   }
 
   get moveSpeed(): number {
-    return this.archetype.moveSpeed;
+    return this.stats.moveSpeed;
   }
 
   get attackDamage(): number {
-    return this.archetype.attackDamage;
+    return this.stats.attackDamage;
   }
 
   get attackRange(): number {
-    return this.archetype.attackRange;
+    return this.stats.attackRange;
   }
 
   get attackInterval(): number {
-    return this.archetype.attackInterval;
+    return this.stats.attackInterval;
   }
 
   /** What this unit is, for targeting checks. */
@@ -106,14 +126,38 @@ export class Unit {
   }
 
   takeDamage(amount: number) {
-    this.hp = Math.max(0, this.hp - amount);
-    this.healthBar.setFraction(this.hp / this.maxHp);
+    const reduced = amount * (1 - this.skills.damageReduction);
+    this.hp = Math.max(0, this.hp - reduced);
+    this.refreshHealthBar();
     if (this.hp === 0) this.setState("dead");
+  }
+
+  /** Redraw the bar after hp or max hp changed outside of taking damage. */
+  refreshHealthBar() {
+    this.healthBar.setFraction(this.hp / this.maxHp);
   }
 
   update(world: World, delta: number) {
     if (!this.isAlive()) return;
+    this.updateAbilities(world, delta);
     this.behavior.update(this, world, delta);
+  }
+
+  /** Fires Seismic Slam when it's off cooldown and something is in reach. */
+  private updateAbilities(world: World, delta: number) {
+    if (!this.skills.hasAbility("slam")) return;
+
+    this.slamCooldown -= delta;
+    if (this.slamCooldown > 0) return;
+
+    const targets = world.enemiesWithin(this, SLAM_RADIUS);
+    if (targets.length === 0) return;
+
+    this.slamCooldown = SLAM_COOLDOWN;
+    for (const target of targets) {
+      target.takeDamage(SLAM_DAMAGE);
+    }
+    this.onSlam?.(this.position, SLAM_RADIUS);
   }
 
   dispose() {

@@ -2,6 +2,7 @@ import "./style.css";
 import { Game } from "./game/Game";
 import { Team } from "./game/entities/Team";
 import { ARCHETYPES, ARCHETYPE_ORDER } from "./game/entities/Archetype";
+import { mountDebugSkillPanel } from "./ui/DebugSkillPanel";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -51,10 +52,14 @@ restartButton.addEventListener("click", () => {
   game.restart();
   restartButton.blur(); // otherwise Space/Enter would re-trigger it
 });
+mountDebugSkillPanel(app, game);
+
 const MAX_LISTED = 10;
 
 game.setOnTick((world) => {
   const selected = game.getSelectedArchetype();
+  // Your units' real numbers, not the archetype baseline.
+  const eff = game.skillTree.statsFor(selected);
 
   const controls =
     "WASD pan · Q/E rotate · R/F pitch · scroll zoom\n" +
@@ -65,8 +70,8 @@ game.setOnTick((world) => {
       const a = ARCHETYPES[id];
       return `${a.id === selected.id ? "▸" : " "}${i + 1} ${a.name}`;
     }).join("  ") +
-    `\n   hp ${selected.maxHp} · spd ${selected.moveSpeed} · dmg ${selected.attackDamage}` +
-    ` · rng ${selected.attackRange} · hits ${selected.canTarget.join("+")}\n\n`;
+    `\n   hp ${eff.maxHp} · spd ${eff.moveSpeed} · dmg ${eff.attackDamage}` +
+    ` · rng ${eff.attackRange} · hits ${selected.canTarget.join("+")}\n\n`;
 
   const counts = `familiars ${world.unitsOfTeam(Team.Player).length}  ·  enemies ${
     world.unitsOfTeam(Team.Enemy).length
@@ -76,7 +81,8 @@ game.setOnTick((world) => {
     .slice(0, MAX_LISTED)
     .map(
       (u) =>
-        `${u.id.padEnd(11)} ${u.archetype.name.padEnd(7)} ${u.getState().padEnd(9)} hp ${u.hp}/${u.maxHp}`,
+        // Ceil so a unit clinging on with 0.3hp doesn't read as dead.
+        `${u.id.padEnd(11)} ${u.archetype.name.padEnd(7)} ${u.getState().padEnd(9)} hp ${Math.ceil(u.hp)}/${u.maxHp}`,
     )
     .join("\n");
 

@@ -6,6 +6,8 @@ import { Unit } from "./entities/Unit";
 import { Team } from "./entities/Team";
 import { SeekAndAttackBehavior } from "./behaviors/SeekAndAttackBehavior";
 import { ARCHETYPES, ARCHETYPE_ORDER, type Archetype, type ArchetypeId } from "./entities/Archetype";
+import { EMPTY_TREE, SkillTreeState } from "./skills/SkillTree";
+import { SlamEffects } from "./effects/SlamEffect";
 
 const TEAM_COLOR: Record<Team, number> = {
   [Team.Player]: 0x4fd1c5,
@@ -27,6 +29,10 @@ export class Game {
   private nextUnitId = 0;
   private selectedArchetype: ArchetypeId = "ground";
 
+  /** Player progression. Survives Restart — that only clears the field. */
+  readonly skillTree = new SkillTreeState();
+  private readonly slamEffects: SlamEffects;
+
   private readonly container: HTMLElement;
   private onTick?: (world: World) => void;
 
@@ -38,6 +44,7 @@ export class Game {
     container.appendChild(this.renderer.domElement);
 
     this.wizardCamera = new WizardCamera(container.clientWidth / container.clientHeight);
+    this.slamEffects = new SlamEffects(this.scene);
 
     this.setupScene();
     this.spawnDemoUnits();
@@ -92,6 +99,9 @@ export class Game {
       archetype,
       position,
       behavior: new SeekAndAttackBehavior(),
+      // Progression is the player's; enemies fight at archetype baseline.
+      skills: team === Team.Player ? this.skillTree : EMPTY_TREE,
+      onSlam: (at, radius) => this.slamEffects.spawn(at, radius),
     });
     this.world.add(unit);
     this.scene.add(unit.mesh);
@@ -100,6 +110,39 @@ export class Game {
 
   getSelectedArchetype(): Archetype {
     return ARCHETYPES[this.selectedArchetype];
+  }
+
+  /**
+   * Unlocks a skill and reconciles units already on the field, so a +maxHp
+   * pick reads as a bigger bar rather than a wounded one.
+   */
+  unlockSkill(id: string): boolean {
+    const before = this.playerUnitMaxHp();
+    if (!this.skillTree.unlock(id)) return false;
+    this.applyMaxHpDelta(before);
+    return true;
+  }
+
+  resetSkills() {
+    const before = this.playerUnitMaxHp();
+    this.skillTree.reset();
+    this.applyMaxHpDelta(before);
+  }
+
+  private playerUnitMaxHp(): Map<Unit, number> {
+    const previous = new Map<Unit, number>();
+    for (const unit of this.world.unitsOfTeam(Team.Player)) {
+      previous.set(unit, unit.maxHp);
+    }
+    return previous;
+  }
+
+  private applyMaxHpDelta(previous: Map<Unit, number>) {
+    for (const [unit, oldMax] of previous) {
+      if (!unit.isAlive()) continue;
+      unit.hp = THREE.MathUtils.clamp(unit.hp + (unit.maxHp - oldMax), 1, unit.maxHp);
+      unit.refreshHealthBar();
+    }
   }
 
   private spawnDemoUnits() {
@@ -128,6 +171,7 @@ export class Game {
   /** Clears the battlefield and respawns the starting units. */
   restart() {
     this.world.clear();
+    this.slamEffects.clear();
     this.nextUnitId = 0;
     this.spawnDemoUnits();
   }
@@ -150,6 +194,7 @@ export class Game {
       unit.update(this.world, delta);
     }
     this.world.removeDead();
+    this.slamEffects.update(delta);
 
     this.onTick?.(this.world);
     this.renderer.render(this.scene, this.wizardCamera.camera);
