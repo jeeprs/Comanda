@@ -10,6 +10,21 @@ npm install
 npm run dev
 ```
 
+## The page isn't updating
+
+Vite watches your files, so a `git pull` should hot-reload the browser with no
+restart. If it doesn't, you almost certainly have a stray dev server from an
+earlier session:
+
+```bash
+pkill -f vite     # kill every stray server
+npm run dev       # start one clean
+```
+
+The dev server is pinned to port 5173 (`strictPort` in `vite.config.ts`), so a
+second one fails loudly rather than quietly serving old code on another port.
+Always use the `Local:` URL it prints.
+
 ## Current milestone
 
 - A flat ground plane.
